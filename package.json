@@ -1,22 +1,37 @@
 {
   "name": "bot-fee-management",
   "version": "1.0.0",
-  "description": "Trading Bot Fee & Referral Management System with Human-like UI in React.js and Node.js MongoDB Atlas",
-  "main": "api/index.js",
+  "description": "Trading Bot Fee & Referral Management System",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "dev:backend": "cd backend && npm start",
-    "dev:frontend": "cd frontend && npm run dev",
-    "seed": "cd backend && npm run seed"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node backend/server.js",
+    "dev:backend": "node backend/server.js",
+    "seed": "node backend/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.62.0",
     "mongoose": "^9.11.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.5"
   },
   "keywords": [],
   "author": "Hussain Ijaz",
