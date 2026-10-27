@@ -42,9 +42,11 @@ app.use(async (req, res, next) => {
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/bot', botRoutes);
+app.use('/bot', botRoutes);
+app.use('/', authRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
