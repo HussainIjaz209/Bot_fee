@@ -1,0 +1,141 @@
+# Trading Bot Fee & Referral Management System
+
+### System Overview & Purpose
+The **Trading Bot Fee & Referral Management System** is a dedicated web application designed to track, bill, and manage monthly subscription fees for trading bot clients while managing and auditing referral commissions.
+
+* **Client Bot Fee**: **\$50.00 / month** per client.
+* **Regional Manager Referral Bonus**: **\$2.50 / client** earned by the Regional Manager (Talha) whenever a client pays their monthly bot fee.
+* **Separation Principle**: The client’s \$50 bot fee and Talha’s \$2.50 referral bonus are completely decoupled. Collecting the client’s fee sets the commission to **Unpaid / Pending Release**, allowing administrators to review and disburse referral bonuses independently.
+
+
+
+## 2. Database Architecture & Data Isolation
+
+
+* **Collection Name**: `bot_records` (MongoDB Atlas `database_name` database).
+
+
+### Client Document Structure
+```json
+{
+  "_id": "6ae10d490349d11cea76b884",
+  "name": "Abdal",
+  "email": "abdalshah382@gmail.com",
+  "monthlyFee": 50,
+  "referralRate": 2.5,
+  "assignedManager": "Talha",
+  "firstPaymentDate": "2026-09-15",
+  "nextDueDate": "2026-11-15",
+  "notes": "MT5 account #12345",
+  "payments": {
+    "2026": {
+      "October": {
+        "status": "paid",
+        "paidDate": "2026-10-27",
+        "amount": 50,
+        "referralBonus": 2.5,
+        "referralStatus": "pending",
+        "notes": "Paid via USDT"
+      }
+    }
+  },
+  "createdAt": "2026-10-27T21:00:00.000Z",
+  "updatedAt": "2026-10-27T21:50:00.000Z"
+}
+```
+
+---
+
+## 3. Core Business Logic & Workflow
+
+```
+[ Client Joined / Registered ]
+               │
+               ▼
+   [ First Payment Date Set with 7 day free tires on first month] ──► (Next Due Date Auto-Calculated +30 days)
+               │
+               ▼
+   [ Monthly Bot Billing Cycle ]
+   ┌─────────────────────────────────────────────────────────────┐
+   │ • Status: UNSET  (-) ──► Initial state at start of month    │
+   │ • Status: DUE    (!) ──► 30 days passed, fee awaiting pay (First Month Payment on 7th day)   │
+   │ • Status: PAID   (✓) ──► Client paid $50 monthly fee        │
+   └─────────────────────────────────────────────────────────────┘
+               │
+   ┌───────────┴─────────────────────────────────────────────────┐
+   │ When Marked PAID ($50):                                     │
+   │ Referral Bonus is automatically initialized to UNPAID       │
+   │ (referralStatus: "pending")                                 │
+   └─────────────────────────────────────────────────────────────┘
+               │
+               ▼
+   [ Referral Commission Review ]
+   ┌─────────────────────────────────────────────────────────────┐
+   │ • ⏳ Bonus Pending (Click to Pay)                           │
+   │                                                             │
+   │ • Once administrator / finance pays out Talha's $2.50:      │
+   │   Clicking button immediately marks bonus as:               │
+   │   [ ✓ Bonus Paid ($2.50) ]                                  │
+   └─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. Key Features & Functionality
+
+### A. Real-Time Statistics & All-Time Analytics Dashboard
+The top analytics bar displays four metric cards:
+1. **Total Bot Clients**: Total registered accounts managed under the bot system.
+2. **Current Month Collection**: Number and percentage of paid clients for the selected month, along with total \$ collected (e.g., `50 paid (96%) | $2,500 collected`).
+3. **All-Time Referral Bonus ($2.50)**: Aggregates total referral commissions earned by Talha across **all-time paid clients** across all months and years (e.g., `53 clients × $2.50 = $132.50`).
+4. **All-Time Referral Payout**: Tracks how much referral money has been disbursed to Talha vs. what remains pending release (e.g., `$2.50 received | $130.00 pending release`).
+
+### B. Interactive 12-Month Table
+* **Client & Identity**: Displays client name and email.
+* **Billing Cycle & Next Due**: Shows registration date (`1st`) and next renewal date (`Next`), automatically calculated using calendar month rolling logic.
+* **Referral Bonus ($2.50)**:
+  * **When Fee is Paid**: Shows interactive status button:
+    * `[ ⏳ Bonus Pending (Click to Pay) ]` (Pulsing Amber) – Click to release bonus.
+    * `[ ✓ Bonus Paid ($2.50) ]` (Emerald) – Bonus completed.
+  * **When Fee is Unpaid**: Displays `Bot Fee Unpaid` in muted gray.
+* **Month Columns (Jan – Dec)**:
+  * Clicking any month cell opens the **Bot Fee Payment modal** with options for `PAID ($50)`, `NEED TO PAY`, `UNSET`, custom payment date, and notes.
+  * When in the **Bonus Pending** tab, clicking a paid month cell instantly marks the bonus as paid without touching the bot fee.
+
+### C. Multi-Level Filtering
+* **Quick Filter Tabs**:
+  * **All Clients**: Shows all registered bot clients.
+  * **Need to Pay ($50)**: Clients with due bot fees for the selected month.
+  * **Paid ($50)**: Clients who have paid their $50 fee for the selected month.
+  * **Bonus Received ($2.50)**: Clients whose referral commission has already been paid out to Talha.
+  * **Bonus Pending ($2.50)**: Clients whose bot fee is paid, but Talha’s referral commission is awaiting payout.
+  * **Unset**: Clients whose billing status has not yet been set for the month.
+* **Instant Search**: Real-time filtering by client name, email.
+
+
+### E. Reminders & Client Communications
+* **Unpaid Client Reminders Modal**: Lists all clients who have not yet paid the current month’s $50 bot fee.
+* **Copy WhatsApp / Email Template**: Generates formatted, ready-to-send payment reminder messages with one click.
+
+### F. Excel Export
+* Downloads a complete Excel spreadsheet (`Bot_Fee_Records_<Year>.xlsx`) formatted with client contact information, monthly fee history, payment dates, and referral payout statuses.
+
+---
+
+## 5. Backend REST API Endpoints
+
+All bot endpoints are secured via JWT/HMAC bearer token authentication (`requireAuth`):
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/login` | Authenticates users (`HussainIjaz` or `Talha`) and returns session token. |
+| `GET` | `/api/bot/records` | Retrieves bot clients with search, year filtering, and next-due calculation. |
+| `POST` | `/api/bot/records` | Creates a new bot client ($50 monthly fee, $2.50 referral rate). |
+| `PUT` | `/api/bot/records/:id` | Updates client profile (name, email, dates, notes). |
+| `DELETE` | `/api/bot/records/:id` | Deletes a client from `bot_records` (leaves VPS records untouched). |
+| `PUT` | `/api/bot/records/:id/payment` | Updates month payment (Paid/Due/Unset). Automatically sets bonus to `pending`. |
+| `PUT` | `/api/bot/records/:id/referral-status` | 1-click endpoint to toggle referral status (`received` vs `pending`). |
+| `POST` | `/api/bot/records/batch-payment` | Bulk updates payment statuses for selected client IDs. |
+| `POST` | `/api/bot/records/batch-referral-status` | Bulk updates referral commission status for selected client IDs. |
+| `GET` | `/api/bot/stats` | Returns current month stats and all-time referral metrics. |
+| `GET` | `/api/bot/export-excel` | Generates and streams downloadable Excel workbook. |
