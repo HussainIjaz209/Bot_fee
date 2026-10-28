@@ -1,4 +1,6 @@
 require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -30,29 +32,49 @@ async function connectToDatabase() {
 }
 
 app.use(async (req, res, next) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (err) {
-    console.error('Database connection error:', err);
-    res.status(500).json({ message: 'Database connection failed', error: err.message });
+  // Only connect to DB on /api requests
+  if (req.path.startsWith('/api')) {
+    try {
+      await connectToDatabase();
+    } catch (err) {
+      console.error('Database connection error:', err);
+      return res.status(500).json({ message: 'Database connection failed', error: err.message });
+    }
   }
+  next();
 });
 
-// Routes
+// API Routes
 app.use('/api', authRoutes);
 app.use('/api/bot', botRoutes);
-app.use('/bot', botRoutes);
-app.use('/', authRoutes);
 
 // Health check
-app.get(['/api/health', '/health'], (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
 });
+
+// Static frontend serving (Express 5 compatible)
+const distPath = fs.existsSync(path.join(__dirname, '../dist'))
+  ? path.join(__dirname, '../dist')
+  : path.join(__dirname, '../frontend/dist');
+
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
+    }
+    next();
+  });
+}
 
 module.exports = app;
 module.exports.connectToDatabase = connectToDatabase;

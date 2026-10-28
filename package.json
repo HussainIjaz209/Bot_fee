@@ -1,14 +1,14 @@
 {
   "name": "bot-fee-management",
   "version": "1.0.0",
-  "description": "Trading Bot Fee & Referral Management System",
+  "description": "Trading Bot Fee & Referral Management System with Human-like UI in React.js and Node.js MongoDB Atlas",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node backend/server.js",
-    "dev:backend": "node backend/server.js",
-    "seed": "node backend/seed.js"
+    "seed": "node scripts/restore.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -27,8 +27,6 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.5"
