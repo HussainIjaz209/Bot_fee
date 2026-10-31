@@ -72,12 +72,13 @@ export const api = {
   getStats: (year, month) =>
     request(`/bot/stats?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`),
 
-  getRecords: (year, month, search = '', filter = 'all') => {
+  getRecords: (year, month, search = '', filter = 'all', status = 'active') => {
     const params = new URLSearchParams({
       year,
       month,
       ...(search ? { search } : {}),
       ...(filter && filter !== 'all' ? { filter } : {}),
+      ...(status ? { status } : {}),
     });
     return request(`/bot/records?${params.toString()}`);
   },
@@ -92,6 +93,12 @@ export const api = {
     request(`/bot/records/${id}`, {
       method: 'PUT',
       body: JSON.stringify(clientData),
+    }),
+
+  updateAccountStatus: (id, status) =>
+    request(`/bot/records/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
     }),
 
   deleteRecord: (id) =>

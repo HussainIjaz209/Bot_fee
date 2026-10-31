@@ -82,6 +82,11 @@ const ClientSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  status: {
+    type: String,
+    enum: ['active', 'deactivated'],
+    default: 'active'
+  },
   // payments structure: { "2026": { "January": PaymentMonthSchema, ... } }
   // We use Schema.Types.Mixed or Map for dynamic nested months
   payments: {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Sparkles, Calendar, ShieldCheck, User, Mail, Phone, FileText } from 'lucide-react';
+import { X, UserPlus, Sparkles, Calendar, ShieldCheck, User, Mail, Phone, FileText, Info } from 'lucide-react';
 
-export default function AddClientModal({ isOpen, onClose, onAddClient }) {
+export default function AddClientModal({ isOpen, onClose, onAddClient, existingEmails = [] }) {
   if (!isOpen) return null;
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -17,6 +17,9 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
   const [nextDueDate, setNextDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailExists = Boolean(normalizedEmail && existingEmails.includes(normalizedEmail));
 
   // Recalculate next due date when firstPaymentDate or free trial changes
   useEffect(() => {
@@ -40,7 +43,7 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
     try {
       await onAddClient({
         name,
-        email,
+        email: normalizedEmail,
         phone,
         monthlyFee: Number(monthlyFee),
         referralRate: Number(referralRate),
@@ -50,6 +53,7 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
         freeTrialDays: Number(freeTrialDays),
         nextDueDate,
         notes,
+        status: 'active'
       });
       onClose();
     } catch (err) {
@@ -70,10 +74,10 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
             </div>
             <div>
               <h3 className="text-base font-semibold text-stone-900">
-                Register New Bot Client
+                Register New Client & Account
               </h3>
               <p className="text-xs text-stone-500">
-                Automatic 7-day trial & $2.50 referral bonus link
+                Add a new user with their initial trading bot account
               </p>
             </div>
           </div>
@@ -99,7 +103,7 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Abdal"
+                placeholder="e.g. Abdal or Account Alias"
                 className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
               />
             </div>
@@ -119,6 +123,15 @@ export default function AddClientModal({ isOpen, onClose, onAddClient }) {
               />
             </div>
           </div>
+
+          {emailExists && (
+            <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs flex items-center gap-2">
+              <Info className="w-4 h-4 shrink-0 text-amber-600" />
+              <span>
+                <strong>Existing Email:</strong> This client already has accounts. Adding this will register a new account under their email.
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>

@@ -39,7 +39,9 @@ router.get('/stats', async (req, res) => {
     const year = req.query.year || new Date().getFullYear().toString();
     const month = req.query.month || MONTHS[new Date().getMonth()];
 
-    const clients = await Client.find();
+    // Only count active clients in active operational statistics
+    const clients = await Client.find({ status: { $ne: 'deactivated' } });
+    const deactivatedCount = await Client.countDocuments({ status: 'deactivated' });
     const totalClients = clients.length;
 
     let currentMonthPaid = 0;
@@ -109,6 +111,7 @@ router.get('/stats', async (req, res) => {
       year,
       month,
       totalClients,
+      deactivatedCount,
       currentMonth: {
         paidCount: currentMonthPaid,
         dueCount: currentMonthDue,
@@ -147,18 +150,42 @@ router.get('/stats', async (req, res) => {
 // -------------------------------------------------------------
 router.get('/records', async (req, res) => {
   try {
-    const { year = new Date().getFullYear().toString(), month = MONTHS[new Date().getMonth()], search, filter } = req.query;
+    const {
+      year = new Date().getFullYear().toString(),
+      month = MONTHS[new Date().getMonth()],
+      search,
+      filter,
+      status = 'active'
+    } = req.query;
 
     let query = {};
+    if (status === 'deactivated') {
+      query.status = 'deactivated';
+    } else if (status === 'all') {
+      // no status filter
+    } else {
+      query.status = { $ne: 'deactivated' };
+    }
+
     if (search && search.trim()) {
       const regex = new RegExp(search.trim(), 'i');
-      query.$or = [
+      const searchConditions = [
         { name: regex },
         { email: regex },
         { phone: regex },
         { notes: regex },
         { assignedManager: regex }
       ];
+      if (query.status) {
+        query = {
+          $and: [
+            { status: query.status },
+            { $or: searchConditions }
+          ]
+        };
+      } else {
+        query.$or = searchConditions;
+      }
     }
 
     let clients = await Client.find(query).sort({ createdAt: -1 });
@@ -264,7 +291,8 @@ router.put('/records/:id', async (req, res) => {
       nextDueDate,
       hasFreeTrial,
       freeTrialDays,
-      notes
+      notes,
+      status
     } = req.body;
 
     const client = await Client.findById(id);
@@ -283,12 +311,43 @@ router.put('/records/:id', async (req, res) => {
     if (hasFreeTrial !== undefined) client.hasFreeTrial = Boolean(hasFreeTrial);
     if (freeTrialDays !== undefined) client.freeTrialDays = Number(freeTrialDays);
     if (notes !== undefined) client.notes = notes;
+    if (status !== undefined) client.status = status;
 
     await client.save();
     res.json({ message: 'Client updated successfully', client });
   } catch (error) {
     console.error('Update client error:', error);
     res.status(500).json({ message: 'Failed to update client', error: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// PUT /api/bot/records/:id/status - 1-click Activate / Deactivate account
+// -------------------------------------------------------------
+router.put('/records/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['active', 'deactivated'].includes(status)) {
+      return res.status(400).json({ message: 'Valid status ("active" or "deactivated") is required.' });
+    }
+
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ message: 'Account not found.' });
+    }
+
+    client.status = status;
+    await client.save();
+
+    res.json({
+      message: `Account has been ${status === 'active' ? 'activated' : 'deactivated'} successfully.`,
+      client
+    });
+  } catch (error) {
+    console.error('Update status error:', error);
+    res.status(500).json({ message: 'Failed to update account status', error: error.message });
   }
 });
 

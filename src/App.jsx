@@ -13,8 +13,10 @@ import Header from './components/Header';
 import StatsCards from './components/StatsCards';
 import FilterTabs from './components/FilterTabs';
 import ClientTable from './components/ClientTable';
+import DeactivatedTable from './components/DeactivatedTable';
 import PaymentModal from './components/PaymentModal';
 import AddClientModal from './components/AddClientModal';
+import AddAccountModal from './components/AddAccountModal';
 import EditClientModal from './components/EditClientModal';
 import RemindersModal from './components/RemindersModal';
 import BatchBar from './components/BatchBar';
@@ -28,6 +30,9 @@ export default function App() {
   const [currentUser, setUser] = useState(getCurrentUser());
   const [loading, setLoading] = useState(true);
 
+  // View state: 'active' | 'deactivated'
+  const [activeView, setActiveView] = useState('active');
+
   // Filters & Date selectors
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedMonth, setSelectedMonth] = useState('October');
@@ -36,12 +41,14 @@ export default function App() {
 
   // Data states
   const [allClients, setAllClients] = useState([]);
+  const [deactivatedClients, setDeactivatedClients] = useState([]);
   const [stats, setStats] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Modals
   const [paymentModalData, setPaymentModalData] = useState(null); // { client, year, month }
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddClientModalOpen, setIsAddClientModalOpen] = useState(false);
+  const [addAccountTarget, setAddAccountTarget] = useState(null); // { email, phone }
   const [editClientData, setEditClientData] = useState(null);
   const [isRemindersOpen, setIsRemindersOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
@@ -84,12 +91,14 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const [statsRes, recordsRes] = await Promise.all([
+      const [statsRes, activeRes, deactivatedRes] = await Promise.all([
         api.getStats(selectedYear, selectedMonth),
-        api.getRecords(selectedYear, selectedMonth, searchQuery, 'all'),
+        api.getRecords(selectedYear, selectedMonth, searchQuery, 'all', 'active'),
+        api.getRecords(selectedYear, selectedMonth, searchQuery, 'all', 'deactivated'),
       ]);
       setStats(statsRes);
-      setAllClients(recordsRes.clients || []);
+      setAllClients(activeRes.clients || []);
+      setDeactivatedClients(deactivatedRes.clients || []);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -103,7 +112,7 @@ export default function App() {
     }
   }, [currentUser, fetchData]);
 
-  // Compute filter counts
+  // Compute filter counts for active accounts
   const counts = useMemo(() => {
     let all = allClients.length;
     let need_to_pay = 0;
@@ -128,7 +137,7 @@ export default function App() {
     return { all, need_to_pay, paid, bonus_pending, bonus_received, unset };
   }, [allClients, selectedYear, selectedMonth]);
 
-  // Filter clients based on tab
+  // Filter clients based on sub-tab
   const filteredClients = useMemo(() => {
     return allClients.filter((client) => {
       const p = client.payments?.[selectedYear]?.[selectedMonth] || { status: 'unset', referralStatus: 'none' };
@@ -142,7 +151,7 @@ export default function App() {
     });
   }, [allClients, selectedYear, selectedMonth, currentFilter]);
 
-  // Unpaid clients for Reminders Modal
+  // Unpaid clients for Reminders Modal (active only)
   const unpaidClients = useMemo(() => {
     return allClients.filter((client) => {
       const p = client.payments?.[selectedYear]?.[selectedMonth];
@@ -211,7 +220,7 @@ export default function App() {
         amount: 50,
       });
       triggerCelebration();
-      showToast(`Marked ${selectedIds.length} clients as Paid for ${selectedMonth}!`);
+      showToast(`Marked ${selectedIds.length} accounts as Paid for ${selectedMonth}!`);
       setSelectedIds([]);
       await fetchData();
     } catch (err) {
@@ -229,7 +238,7 @@ export default function App() {
         referralStatus: 'received',
       });
       triggerCelebration();
-      showToast(`Released bonuses ($2.50) for selected clients!`);
+      showToast(`Released bonuses ($2.50) for selected accounts!`);
       setSelectedIds([]);
       await fetchData();
     } catch (err) {
@@ -237,32 +246,78 @@ export default function App() {
     }
   };
 
-  // Client CRUD
+  // Register new client user
   const handleAddClient = async (clientData) => {
     try {
       await api.createRecord(clientData);
-      showToast(`Registered new client: ${clientData.name}`);
+      triggerCelebration();
+      showToast(`Registered new client: ${clientData.name} (${clientData.email})`);
       await fetchData();
     } catch (err) {
       alert(err.message || 'Failed to register client');
     }
   };
 
+  // Add an additional account to existing email
+  const handleAddAccount = async (accountData) => {
+    try {
+      await api.createRecord(accountData);
+      triggerCelebration();
+      showToast(`Added account "${accountData.name}" under ${accountData.email}`);
+      await fetchData();
+    } catch (err) {
+      alert(err.message || 'Failed to add account');
+    }
+  };
+
   const handleUpdateClient = async (id, clientData) => {
     try {
       await api.updateRecord(id, clientData);
-      showToast('Client profile updated');
+      showToast('Account details updated');
       await fetchData();
     } catch (err) {
-      alert(err.message || 'Failed to update client');
+      alert(err.message || 'Failed to update account');
+    }
+  };
+
+  // Deactivate account
+  const handleDeactivateClient = async (client) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to deactivate "${client.name}" (${client.email})?\n\nThis account will be moved to the Deactivated Accounts table. You can reactivate it at any time.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.updateAccountStatus(client._id, 'deactivated');
+      showToast(`Account "${client.name}" has been deactivated.`);
+      await fetchData();
+    } catch (err) {
+      alert(err.message || 'Failed to deactivate account');
+    }
+  };
+
+  // Reactivate account
+  const handleActivateClient = async (client) => {
+    const confirmed = window.confirm(
+      `Reactivate account "${client.name}" (${client.email})?\n\nThis account will be restored to the Active Accounts table.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.updateAccountStatus(client._id, 'active');
+      triggerCelebration();
+      showToast(`✓ Account "${client.name}" is now active!`);
+      await fetchData();
+    } catch (err) {
+      alert(err.message || 'Failed to activate account');
     }
   };
 
   const handleDeleteClient = async (client) => {
-    if (!window.confirm(`Are you sure you want to remove ${client.name}?`)) return;
+    if (!window.confirm(`Permanently delete account record "${client.name}" (${client.email})?`)) return;
     try {
       await api.deleteRecord(client._id);
-      showToast(`Client ${client.name} removed`);
+      showToast(`Account "${client.name}" removed`);
       await fetchData();
     } catch (err) {
       alert(err.message || 'Failed to delete client');
@@ -306,6 +361,14 @@ export default function App() {
     return <LoginView onLoginSuccess={(u) => setUser(u)} />;
   }
 
+  // All known unique emails for duplicate checks
+  const existingEmails = [
+    ...new Set([
+      ...allClients.map((c) => (c.email || '').toLowerCase().trim()),
+      ...deactivatedClients.map((c) => (c.email || '').toLowerCase().trim()),
+    ]),
+  ].filter(Boolean);
+
   return (
     <div className="min-h-screen bg-[#FAF9F5] text-stone-800 flex flex-col font-sans">
       {/* Top Header */}
@@ -316,7 +379,7 @@ export default function App() {
         setSelectedYear={setSelectedYear}
         selectedMonth={selectedMonth}
         setSelectedMonth={setSelectedMonth}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
+        onOpenAddModal={() => setIsAddClientModalOpen(true)}
         onOpenRemindersModal={() => setIsRemindersOpen(true)}
         onExportExcel={handleExportExcel}
         exportLoading={exportLoading}
@@ -331,42 +394,59 @@ export default function App() {
           selectedYear={selectedYear}
         />
 
-        {/* Filters & Instant Search */}
+        {/* View Switcher, Filter Tabs & Instant Search */}
         <FilterTabs
+          activeView={activeView}
+          setActiveView={setActiveView}
           currentFilter={currentFilter}
           setFilter={setFilter}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           counts={counts}
+          deactivatedCount={deactivatedClients.length}
         />
 
-        {/* 12-Month Interactive Table */}
-        <ClientTable
-          clients={filteredClients}
-          selectedYear={selectedYear}
-          selectedMonth={selectedMonth}
-          currentFilter={currentFilter}
-          selectedIds={selectedIds}
-          onToggleSelect={handleToggleSelect}
-          onSelectAll={handleSelectAll}
-          onCellClick={(client, year, month) => {
-            setPaymentModalData({ client, year, month });
-          }}
-          onToggleReferral={handleToggleReferral}
-          onEditClient={(client) => setEditClientData(client)}
-          onDeleteClient={handleDeleteClient}
-        />
+        {/* Conditional Table Display */}
+        {activeView === 'active' ? (
+          <ClientTable
+            clients={filteredClients}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            currentFilter={currentFilter}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAll={handleSelectAll}
+            onCellClick={(client, year, month) => {
+              setPaymentModalData({ client, year, month });
+            }}
+            onToggleReferral={handleToggleReferral}
+            onEditClient={(client) => setEditClientData(client)}
+            onDeactivateClient={handleDeactivateClient}
+            onDeleteClient={handleDeleteClient}
+            onOpenAddAccount={(email, phone) => {
+              setAddAccountTarget({ email, phone });
+            }}
+          />
+        ) : (
+          <DeactivatedTable
+            deactivatedClients={deactivatedClients}
+            onActivateClient={handleActivateClient}
+            onDeleteClient={handleDeleteClient}
+          />
+        )}
       </main>
 
-      {/* Floating Batch Actions Bar */}
-      <BatchBar
-        selectedCount={selectedIds.length}
-        onClearSelection={() => setSelectedIds([])}
-        onBulkPayFee={handleBulkPayFee}
-        onBulkReleaseBonus={handleBulkReleaseBonus}
-        month={selectedMonth}
-        year={selectedYear}
-      />
+      {/* Floating Batch Actions Bar (Active view only) */}
+      {activeView === 'active' && (
+        <BatchBar
+          selectedCount={selectedIds.length}
+          onClearSelection={() => setSelectedIds([])}
+          onBulkPayFee={handleBulkPayFee}
+          onBulkReleaseBonus={handleBulkReleaseBonus}
+          month={selectedMonth}
+          year={selectedYear}
+        />
+      )}
 
       {/* Payment Update Modal */}
       {paymentModalData && (
@@ -380,12 +460,24 @@ export default function App() {
         />
       )}
 
-      {/* Add Client Modal */}
+      {/* Add Client Modal (New Email user + initial account) */}
       <AddClientModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        isOpen={isAddClientModalOpen}
+        onClose={() => setIsAddClientModalOpen(false)}
         onAddClient={handleAddClient}
+        existingEmails={existingEmails}
       />
+
+      {/* Add Account Modal (Dedicated for adding accounts under an existing email) */}
+      {addAccountTarget && (
+        <AddAccountModal
+          isOpen={true}
+          onClose={() => setAddAccountTarget(null)}
+          targetEmail={addAccountTarget.email}
+          targetPhone={addAccountTarget.phone}
+          onAddAccount={handleAddAccount}
+        />
+      )}
 
       {/* Edit Client Modal */}
       {editClientData && (
