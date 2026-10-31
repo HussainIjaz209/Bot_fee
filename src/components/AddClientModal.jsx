@@ -13,7 +13,7 @@ export default function AddClientModal({ isOpen, onClose, onAddClient, existingE
   const [assignedManager, setAssignedManager] = useState('Talha');
   const [firstPaymentDate, setFirstPaymentDate] = useState(todayStr);
   const [hasFreeTrial, setHasFreeTrial] = useState(true);
-  const [freeTrialDays, setFreeTrialDays] = useState(7);
+  const [freeTrialDays, setFreeTrialDays] = useState(11);
   const [nextDueDate, setNextDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,8 +29,8 @@ export default function AddClientModal({ isOpen, onClose, onAddClient, existingE
 
     const next = new Date(baseDate);
     if (hasFreeTrial) {
-      // 7-day free trial on first month
-      next.setDate(next.getDate() + Number(freeTrialDays || 7));
+      // 11-day free trial on first month
+      next.setDate(next.getDate() + Number(freeTrialDays || 11));
     } else {
       next.setDate(next.getDate() + 30);
     }
@@ -53,7 +53,7 @@ export default function AddClientModal({ isOpen, onClose, onAddClient, existingE
         freeTrialDays: Number(freeTrialDays),
         nextDueDate,
         notes,
-        status: 'active'
+        status: hasFreeTrial ? 'trial' : 'active'
       });
       onClose();
     } catch (err) {
@@ -172,10 +172,10 @@ export default function AddClientModal({ isOpen, onClose, onAddClient, existingE
                   onChange={(e) => setHasFreeTrial(e.target.checked)}
                   className="rounded-sm border-stone-300 text-amber-600 focus:ring-amber-500/30"
                 />
-                <span>Include 7-Day Free Trial on First Month</span>
+                <span>Include 11-Day Free Trial on First Month</span>
               </label>
               <span className="text-[10px] font-medium text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-full">
-                7 Days Free
+                11 Days Free
               </span>
             </div>
 

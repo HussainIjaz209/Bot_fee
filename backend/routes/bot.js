@@ -10,15 +10,15 @@ const MONTHS = [
 ];
 
 // Helper: Calculate next due date
-function calculateNextDueDate(firstPaymentDate, hasFreeTrial = false, freeTrialDays = 7) {
+function calculateNextDueDate(firstPaymentDate, hasFreeTrial = false, freeTrialDays = 11) {
   if (!firstPaymentDate) return '';
   const date = new Date(firstPaymentDate);
   if (isNaN(date.getTime())) return '';
   
   if (hasFreeTrial) {
-    // 7 day free trial, then 1st payment due
+    // 11 day free trial, then 1st payment due
     const trialEnd = new Date(date);
-    trialEnd.setDate(trialEnd.getDate() + (freeTrialDays || 7));
+    trialEnd.setDate(trialEnd.getDate() + (Number(freeTrialDays) || 11));
     return trialEnd.toISOString().split('T')[0];
   } else {
     // Standard 30 days
@@ -39,8 +39,9 @@ router.get('/stats', async (req, res) => {
     const year = req.query.year || new Date().getFullYear().toString();
     const month = req.query.month || MONTHS[new Date().getMonth()];
 
-    // Only count active clients in active operational statistics
-    const clients = await Client.find({ status: { $ne: 'deactivated' } });
+    // Count active, trial, and deactivated accounts
+    const clients = await Client.find({ status: { $nin: ['trial', 'deactivated'] } });
+    const trialCount = await Client.countDocuments({ status: 'trial' });
     const deactivatedCount = await Client.countDocuments({ status: 'deactivated' });
     const totalClients = clients.length;
 
@@ -111,6 +112,7 @@ router.get('/stats', async (req, res) => {
       year,
       month,
       totalClients,
+      trialCount,
       deactivatedCount,
       currentMonth: {
         paidCount: currentMonthPaid,
@@ -159,12 +161,14 @@ router.get('/records', async (req, res) => {
     } = req.query;
 
     let query = {};
-    if (status === 'deactivated') {
+    if (status === 'trial') {
+      query.status = 'trial';
+    } else if (status === 'deactivated') {
       query.status = 'deactivated';
     } else if (status === 'all') {
       // no status filter
     } else {
-      query.status = { $ne: 'deactivated' };
+      query.status = { $nin: ['trial', 'deactivated'] };
     }
 
     if (search && search.trim()) {
@@ -239,17 +243,20 @@ router.post('/records', async (req, res) => {
       assignedManager = 'Talha',
       firstPaymentDate,
       hasFreeTrial = true,
-      freeTrialDays = 7,
+      freeTrialDays = 11,
       nextDueDate,
-      notes
+      notes,
+      status
     } = req.body;
 
     if (!name || !email || !firstPaymentDate) {
       return res.status(400).json({ message: 'Name, email, and first payment / join date are required.' });
     }
 
-    // Auto-calculate next due date if not provided
+    // Auto-calculate next due date if not provided (11-day free trial default)
     const calculatedNextDue = nextDueDate || calculateNextDueDate(firstPaymentDate, hasFreeTrial, freeTrialDays);
+
+    const initialStatus = status || (Boolean(hasFreeTrial) ? 'trial' : 'active');
 
     const client = new Client({
       name,
@@ -260,8 +267,9 @@ router.post('/records', async (req, res) => {
       assignedManager: assignedManager || 'Talha',
       firstPaymentDate,
       hasFreeTrial: Boolean(hasFreeTrial),
-      freeTrialDays: Number(freeTrialDays) || 7,
+      freeTrialDays: Number(freeTrialDays) || 11,
       nextDueDate: calculatedNextDue,
+      status: initialStatus,
       notes: notes || '',
       payments: {}
     });
@@ -329,8 +337,8 @@ router.put('/records/:id/status', async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status || !['active', 'deactivated'].includes(status)) {
-      return res.status(400).json({ message: 'Valid status ("active" or "deactivated") is required.' });
+    if (!status || !['active', 'trial', 'deactivated'].includes(status)) {
+      return res.status(400).json({ message: 'Valid status ("active", "trial", or "deactivated") is required.' });
     }
 
     const client = await Client.findById(id);
@@ -397,6 +405,10 @@ router.put('/records/:id/payment', async (req, res) => {
     if (status === 'paid') {
       if (newReferralStatus !== 'received') {
         newReferralStatus = 'pending';
+      }
+      // If client is in trial status, graduate them to active subscriber upon first fee payment
+      if (client.status === 'trial') {
+        client.status = 'active';
       }
     } else {
       newReferralStatus = 'none';
@@ -514,6 +526,9 @@ router.post('/records/batch-payment', async (req, res) => {
       };
 
       if (status === 'paid') {
+        if (client.status === 'trial') {
+          client.status = 'active';
+        }
         const pDate = paidDate ? new Date(paidDate) : new Date();
         const nextDate = new Date(pDate);
         nextDate.setDate(nextDate.getDate() + 30);

@@ -2,13 +2,14 @@ import React from 'react';
 import { Search, X, Layers, UserX, CheckCircle } from 'lucide-react';
 
 export default function FilterTabs({
-  activeView, // 'active' | 'deactivated'
+  activeView, // 'active' | 'trial' | 'deactivated'
   setActiveView,
   currentFilter,
   setFilter,
   searchQuery,
   setSearchQuery,
   counts,
+  trialCount = 0,
   deactivatedCount = 0
 }) {
   const tabs = [
@@ -22,7 +23,7 @@ export default function FilterTabs({
 
   return (
     <div className="space-y-3">
-      {/* Top Switcher: Active Accounts vs Deactivated Accounts + Search */}
+      {/* Top Switcher: Active Accounts vs Free Trial (11 Days) vs Deactivated Accounts + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* View Switcher Pills */}
         <div className="inline-flex p-1 bg-stone-200/60 rounded-2xl border border-stone-200/80 shrink-0 self-start sm:self-auto">
@@ -44,6 +45,26 @@ export default function FilterTabs({
 
           <button
             type="button"
+            onClick={() => setActiveView('trial')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+              activeView === 'trial'
+                ? 'bg-white text-stone-900 shadow-2xs'
+                : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span>Free Trial (11 Days)</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                trialCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-600'
+              }`}
+            >
+              {trialCount}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveView('deactivated')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
               activeView === 'deactivated'
@@ -52,7 +73,7 @@ export default function FilterTabs({
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-            <span>Deactivated Accounts</span>
+            <span>Deactivated</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                 deactivatedCount > 0 ? 'bg-rose-100 text-rose-800' : 'bg-stone-100 text-stone-600'

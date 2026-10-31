@@ -11,7 +11,7 @@ export default function AddAccountModal({ isOpen, onClose, targetEmail, targetPh
   const [assignedManager, setAssignedManager] = useState('Talha');
   const [firstPaymentDate, setFirstPaymentDate] = useState(todayStr);
   const [hasFreeTrial, setHasFreeTrial] = useState(true);
-  const [freeTrialDays, setFreeTrialDays] = useState(7);
+  const [freeTrialDays, setFreeTrialDays] = useState(11);
   const [nextDueDate, setNextDueDate] = useState('');
   const [notes, setNotes] = useState('');
   const [phone, setPhone] = useState(targetPhone || '');
@@ -29,7 +29,7 @@ export default function AddAccountModal({ isOpen, onClose, targetEmail, targetPh
 
     const next = new Date(baseDate);
     if (hasFreeTrial) {
-      next.setDate(next.getDate() + Number(freeTrialDays || 7));
+      next.setDate(next.getDate() + Number(freeTrialDays || 11));
     } else {
       next.setDate(next.getDate() + 30);
     }
@@ -56,7 +56,7 @@ export default function AddAccountModal({ isOpen, onClose, targetEmail, targetPh
         freeTrialDays: Number(freeTrialDays),
         nextDueDate,
         notes: notes || '',
-        status: 'active'
+        status: hasFreeTrial ? 'trial' : 'active'
       });
       onClose();
     } catch (err) {
@@ -180,10 +180,10 @@ export default function AddAccountModal({ isOpen, onClose, targetEmail, targetPh
                   onChange={(e) => setHasFreeTrial(e.target.checked)}
                   className="rounded-sm border-stone-300 text-amber-600 focus:ring-amber-500/30"
                 />
-                <span>Include 7-Day Free Trial on First Month</span>
+                <span>Include 11-Day Free Trial on First Month</span>
               </label>
               <span className="text-[10px] font-medium text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-full">
-                7 Days Free
+                11 Days Free
               </span>
             </div>
 

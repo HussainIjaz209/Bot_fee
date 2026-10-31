@@ -72,7 +72,7 @@ const ClientSchema = new mongoose.Schema({
   },
   freeTrialDays: {
     type: Number,
-    default: 7
+    default: 11
   },
   nextDueDate: {
     type: String,
@@ -84,7 +84,7 @@ const ClientSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'deactivated'],
+    enum: ['active', 'trial', 'deactivated'],
     default: 'active'
   },
   // payments structure: { "2026": { "January": PaymentMonthSchema, ... } }

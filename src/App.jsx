@@ -13,6 +13,7 @@ import Header from './components/Header';
 import StatsCards from './components/StatsCards';
 import FilterTabs from './components/FilterTabs';
 import ClientTable from './components/ClientTable';
+import TrialTable from './components/TrialTable';
 import DeactivatedTable from './components/DeactivatedTable';
 import PaymentModal from './components/PaymentModal';
 import AddClientModal from './components/AddClientModal';
@@ -30,7 +31,7 @@ export default function App() {
   const [currentUser, setUser] = useState(getCurrentUser());
   const [loading, setLoading] = useState(true);
 
-  // View state: 'active' | 'deactivated'
+  // View state: 'active' | 'trial' | 'deactivated'
   const [activeView, setActiveView] = useState('active');
 
   // Filters & Date selectors
@@ -41,6 +42,7 @@ export default function App() {
 
   // Data states
   const [allClients, setAllClients] = useState([]);
+  const [trialClients, setTrialClients] = useState([]);
   const [deactivatedClients, setDeactivatedClients] = useState([]);
   const [stats, setStats] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -91,13 +93,15 @@ export default function App() {
     }
     setLoading(true);
     try {
-      const [statsRes, activeRes, deactivatedRes] = await Promise.all([
+      const [statsRes, activeRes, trialRes, deactivatedRes] = await Promise.all([
         api.getStats(selectedYear, selectedMonth),
         api.getRecords(selectedYear, selectedMonth, searchQuery, 'all', 'active'),
+        api.getRecords(selectedYear, selectedMonth, searchQuery, 'all', 'trial'),
         api.getRecords(selectedYear, selectedMonth, searchQuery, 'all', 'deactivated'),
       ]);
       setStats(statsRes);
       setAllClients(activeRes.clients || []);
+      setTrialClients(trialRes.clients || []);
       setDeactivatedClients(deactivatedRes.clients || []);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -365,6 +369,7 @@ export default function App() {
   const existingEmails = [
     ...new Set([
       ...allClients.map((c) => (c.email || '').toLowerCase().trim()),
+      ...trialClients.map((c) => (c.email || '').toLowerCase().trim()),
       ...deactivatedClients.map((c) => (c.email || '').toLowerCase().trim()),
     ]),
   ].filter(Boolean);
@@ -403,6 +408,7 @@ export default function App() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           counts={counts}
+          trialCount={trialClients.length}
           deactivatedCount={deactivatedClients.length}
         />
 
@@ -426,6 +432,19 @@ export default function App() {
             onOpenAddAccount={(email, phone) => {
               setAddAccountTarget({ email, phone });
             }}
+          />
+        ) : activeView === 'trial' ? (
+          <TrialTable
+            trialClients={trialClients}
+            selectedYear={selectedYear}
+            selectedMonth={selectedMonth}
+            onCollectPayment={(client) => {
+              setPaymentModalData({ client, year: selectedYear, month: selectedMonth });
+            }}
+            onActivateDirectly={handleActivateClient}
+            onEditClient={(client) => setEditClientData(client)}
+            onDeactivateClient={handleDeactivateClient}
+            onDeleteClient={handleDeleteClient}
           />
         ) : (
           <DeactivatedTable

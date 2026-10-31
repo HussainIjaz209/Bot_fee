@@ -52,9 +52,16 @@ export default function StatsCards({ stats, selectedMonth, selectedYear }) {
           </span>
           <span className="text-xs text-stone-500">active accounts</span>
         </div>
-        <div className="mt-3 text-xs text-stone-500 flex items-center gap-1.5 pt-3 border-t border-stone-100">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-          <span>MongoDB Atlas: <span className="font-medium text-stone-700">bot_records</span></span>
+        <div className="mt-3 text-xs text-stone-500 flex items-center justify-between pt-3 border-t border-stone-100">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+            <span>MongoDB Atlas</span>
+          </span>
+          {stats?.trialCount > 0 && (
+            <span className="text-amber-800 font-semibold text-[11px] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+              {stats.trialCount} on 11d trial
+            </span>
+          )}
         </div>
       </div>
 
